@@ -26,7 +26,7 @@ async function recordToNotion(amount, items) {
   if (!NOTION_TOKEN || !NOTION_DATABASE_ID) return;
 
   try {
-    await fetch("https://api.notion.com/v1/pages", {
+    const notionRes = await fetch("https://api.notion.com/v1/pages", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${NOTION_TOKEN}`,
@@ -37,12 +37,12 @@ async function recordToNotion(amount, items) {
         parent: { database_id: NOTION_DATABASE_ID },
         properties: {
           "名前": {
-            title: [{ text: { content: `TBB Shop 売上` } }]
+            title: [{ text: { content: "TBB Shop 売上" } }]
           },
           "日時": {
             date: { start: new Date().toISOString() }
           },
-          "合計（sats）": {
+          "合計sats": {
             number: amount
           },
           "明細": {
@@ -51,7 +51,8 @@ async function recordToNotion(amount, items) {
         },
       }),
     });
-    console.log("Notion に記録しました");
+    const result = await notionRes.json();
+    console.log("Notion レスポンス:", JSON.stringify(result));
   } catch (err) {
     // Notion記録失敗は致命的エラーにしない
     console.error("Notion記録エラー:", err);
