@@ -7,7 +7,6 @@ const PORT = process.env.PORT || 8080;
 const AMBOSS_ENDPOINT = "https://rails.amboss.tech/graphql";
 const API_KEY         = process.env.AMBOSS_API_KEY;
 const WALLET_ID       = process.env.AMBOSS_WALLET_ID;
-// 本番フロントエンドのオリジン（GitHub PagesのURL）を環境変数で設定
 const ALLOWED_ORIGIN  = process.env.ALLOWED_ORIGIN || "*";
 
 if (!API_KEY || !WALLET_ID) {
@@ -18,12 +17,9 @@ if (!API_KEY || !WALLET_ID) {
 app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(express.json());
 
-// ── ヘルスチェック ────────────────────────────────
 app.get("/", (_req, res) => res.json({ status: "ok", service: "TBB Shop API" }));
 
 // ── インボイス作成 ────────────────────────────────
-// POST /invoice
-// body: { amount: number, sandbox?: boolean }
 app.post("/invoice", async (req, res) => {
   const { amount, sandbox = false } = req.body;
 
@@ -32,12 +28,17 @@ app.post("/invoice", async (req, res) => {
   }
 
   const mutation = `
-    mutation CreateReceive($input: CreateReceiveInput!) {
-      create_receive(input: $input) {
-        id
-        payment_request
-        amount
-        status
+    mutation CreateReceive($input: CreateReceiveTransactionInput!) {
+      payment {
+        transaction {
+          create_receive(input: $input) {
+            id
+            status
+            payment_request
+            expires_at
+            amount { full_amount }
+          }
+        }
       }
     }
   `;
@@ -59,6 +60,7 @@ app.post("/invoice", async (req, res) => {
           input: {
             wallet_id: WALLET_ID,
             amount:    String(amount),
+            description: "TBB Shop",
             ...(metadata ? { metadata } : {}),
           },
         },
@@ -66,7 +68,7 @@ app.post("/invoice", async (req, res) => {
     });
 
     const data = await ambossRes.json();
-    const inv  = data?.data?.create_receive;
+    const inv  = data?.data?.payment?.transaction?.create_receive;
 
     if (!inv?.payment_request) {
       const msg = data?.errors?.[0]?.message || "Amboss APIエラー";
@@ -76,7 +78,7 @@ app.post("/invoice", async (req, res) => {
     return res.json({
       id:              inv.id,
       payment_request: inv.payment_request,
-      amount:          inv.amount,
+      amount:          inv.amount?.full_amount,
       status:          inv.status,
     });
 
@@ -87,15 +89,18 @@ app.post("/invoice", async (req, res) => {
 });
 
 // ── 支払いステータス確認 ──────────────────────────
-// GET /invoice/:id/status
 app.get("/invoice/:id/status", async (req, res) => {
   const { id } = req.params;
 
   const query = `
-    query GetPayment($id: String!) {
-      payment(id: $id) {
-        id
-        status
+    query GetTransaction($id: String!) {
+      payment {
+        transaction {
+          find_one(id: $id) {
+            id
+            status
+          }
+        }
       }
     }
   `;
@@ -111,7 +116,7 @@ app.get("/invoice/:id/status", async (req, res) => {
     });
 
     const data   = await ambossRes.json();
-    const status = data?.data?.payment?.status;
+    const status = data?.data?.payment?.transaction?.find_one?.status;
 
     if (!status) {
       const msg = data?.errors?.[0]?.message || "支払い情報が見つかりません";
