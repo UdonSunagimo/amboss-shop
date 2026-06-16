@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>TBB Shop — Lightning POS</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0d;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: rgba(255,255,255,0.08);
+    --border-hover: rgba(255,255,255,0.18);
+    --text: #f0f0f0;
+    --muted: #888;
+    --accent: #f7931a;
+    --accent-dim: rgba(247,147,26,0.12);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.1);
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+    min-height: 100dvh;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .app { max-width: 420px; margin: 0 auto; padding: 0 0 80px; }
+
+  .header {
+    padding: 20px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header-logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-name { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--muted); margin-top: -2px; }
+
+  .settings-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent; color: var(--muted);
+    cursor: pointer; font-size: 17px;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+  }
+  .settings-btn:hover { border-color: var(--border-hover); color: var(--text); }
+
+  /* ── screens ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── Tshirt hero image (SVG placeholder) ── */
+  .tshirt-hero {
+    margin: 24px 20px 0;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    aspect-ratio: 16/7;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .tshirt-hero svg { width: 100%; height: 100%; }
+
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    color: var(--muted); text-transform: uppercase;
+    padding: 20px 20px 10px;
+  }
+
+  /* ── product cards ── */
+  .product-list { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+
+  .product-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .product-card.has-qty {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .size-badge {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; color: var(--text);
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+  .product-card.has-qty .size-badge {
+    background: var(--accent);
+    color: #000;
+    border-color: transparent;
+  }
+
+  .product-info { flex: 1; }
+  .product-name { font-size: 15px; font-weight: 500; }
+  .product-price { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .qty-row { display: flex; align-items: center; gap: 12px; }
+  .qty-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1px solid var(--border-hover);
+    background: var(--surface2); color: var(--text);
+    cursor: pointer; font-size: 20px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .qty-btn:active { background: var(--border-hover); }
+  .qty-num { font-size: 16px; font-weight: 600; min-width: 18px; text-align: center; }
+
+  /* ── order bar ── */
+  .order-bar {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 420px;
+    padding: 12px 20px 24px;
+    background: linear-gradient(to top, #0d0d0d 80%, transparent);
+  }
+  .order-summary-inner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    display: none;
+  }
+  .order-summary-inner.visible { display: block; }
+  .summary-row {
+    display: flex; justify-content: space-between;
+    font-size: 13px; color: var(--muted);
+    padding: 3px 0;
+  }
+  .summary-total {
+    display: flex; justify-content: space-between;
+    font-size: 16px; font-weight: 600; color: var(--text);
+    padding-top: 8px; margin-top: 6px;
+    border-top: 1px solid var(--border);
+  }
+
+  .pay-btn {
+    width: 100%; padding: 16px;
+    background: var(--accent); color: #000;
+    border: none; border-radius: var(--radius);
+    font-size: 16px; font-weight: 700;
+    cursor: pointer; letter-spacing: -0.2px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pay-btn:disabled { opacity: 0.3; cursor: default; }
+  .pay-btn:not(:disabled):active { opacity: 0.85; }
+
+  /* ── payment screen ── */
+  .payment-screen { padding: 0 20px; }
+
+  .nav-back {
+    display: flex; align-items: center; gap: 8px;
+    background: none; border: none; color: var(--muted);
+    font-size: 15px; cursor: pointer; padding: 20px 0 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nav-back:hover { color: var(--text); }
+
+  .pay-header { padding: 16px 0 20px; }
+  .pay-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .pay-amount { font-size: 38px; font-weight: 800; letter-spacing: -1px; color: var(--accent); margin-top: 4px; }
+  .pay-amount-label { font-size: 13px; color: var(--muted); }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px; border-radius: 99px;
+    font-size: 13px; font-weight: 600;
+    margin-bottom: 20px;
+  }
+  .status-waiting { background: rgba(247,147,26,0.12); color: var(--accent); border: 1px solid rgba(247,147,26,0.3); }
+  .status-done    { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+  .status-error   { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+
+  .dot-pulse { animation: dotpulse 1.2s ease-in-out infinite; }
+  @keyframes dotpulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+  .qr-wrapper {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 18px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  #qr-canvas { display: block; margin: 0 auto; max-width: 240px; width: 100%; }
+
+  .invoice-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 11px; color: var(--muted);
+    word-break: break-all; line-height: 1.5;
+    max-height: 72px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+    margin-bottom: 16px;
+  }
+
+  .cancel-btn {
+    width: 100%; padding: 14px;
+    background: transparent;
+    border: 1px solid var(--border-hover);
+    border-radius: var(--radius);
+    color: var(--muted); font-size: 15px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── success screen ── */
+  .success-screen { padding: 40px 20px; text-align: center; }
+  .success-ring {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: var(--green-dim);
+    border: 2px solid var(--green);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 24px;
+    font-size: 40px;
+    animation: ring-in 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes ring-in { from{transform:scale(0.5);opacity:0} to{transform:scale(1);opacity:1} }
+  .success-title { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
+  .success-sats { font-size: 36px; font-weight: 800; color: var(--green); letter-spacing: -1px; margin-bottom: 20px; }
+  .success-items {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 24px;
+    text-align: left;
+    font-size: 14px; color: var(--muted); line-height: 2;
+  }
+  .next-btn {
+    width: 100%; padding: 16px;
+    background: var(--accent); color: #000;
+    border: none; border-radius: var(--radius);
+    font-size: 16px; font-weight: 700; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── config screen ── */
+  .config-screen { padding: 0 20px; }
+  .config-group { margin-bottom: 20px; }
+  .config-lbl { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .config-input {
+    width: 100%; padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .config-input:focus { border-color: var(--accent); }
+  .config-hint { font-size: 12px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+  .save-btn {
+    width: 100%; padding: 14px;
+    background: var(--accent); color: #000;
+    border: none; border-radius: var(--radius);
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ─── PRODUCTS SCREEN ─── -->
+  <div id="screen-products" class="screen active">
+
+    <div class="header">
+      <div class="header-logo">
+        <div class="logo-mark">₿</div>
+        <div>
+          <div class="logo-name">TBB Shop</div>
+          <div class="logo-sub">Lightning POS</div>
+        </div>
+      </div>
+      <button class="settings-btn" onclick="showScreen('screen-config')" aria-label="設定">⚙</button>
+    </div>
+
+    <!-- Tシャツダミー画像（SVG） -->
+    <div class="tshirt-hero" aria-hidden="true">
+      <svg viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1e1e1e"/>
+            <stop offset="100%" stop-color="#141414"/>
+          </linearGradient>
+        </defs>
+        <rect width="560" height="200" fill="url(#bg)"/>
+
+        <!-- shirt silhouette (centered) -->
+        <g transform="translate(190,18)">
+          <!-- body -->
+          <path d="M40 30 L0 50 L20 75 L35 62 L35 165 L145 165 L145 62 L160 75 L180 50 L140 30 C130 10 110 0 90 0 C70 0 50 10 40 30Z" fill="#2a2a2a" stroke="#3a3a3a" stroke-width="1.5"/>
+          <!-- collar -->
+          <path d="M60 22 Q90 45 120 22" fill="none" stroke="#444" stroke-width="2"/>
+          <!-- Bitcoin logo on chest -->
+          <text x="84" y="110" font-family="-apple-system,sans-serif" font-size="28" font-weight="800" fill="#f7931a" text-anchor="middle">₿</text>
+          <!-- TBB text -->
+          <text x="84" y="132" font-family="-apple-system,sans-serif" font-size="11" font-weight="600" fill="#555" text-anchor="middle" letter-spacing="3">TBB</text>
+        </g>
+
+        <!-- left label -->
+        <text x="30" y="90" font-family="-apple-system,sans-serif" font-size="10" fill="#444" letter-spacing="1">TOKYO</text>
+        <text x="30" y="104" font-family="-apple-system,sans-serif" font-size="10" fill="#444" letter-spacing="1">BITCOIN</text>
+        <text x="30" y="118" font-family="-apple-system,sans-serif" font-size="10" fill="#444" letter-spacing="1">BASE</text>
+
+        <!-- right label -->
+        <text x="470" y="96" font-family="-apple-system,sans-serif" font-size="10" fill="#444" letter-spacing="1" text-anchor="end">LIMITED</text>
+        <text x="470" y="110" font-family="-apple-system,sans-serif" font-size="10" fill="#444" letter-spacing="1" text-anchor="end">EDITION</text>
+      </svg>
+    </div>
+
+    <div class="section-label">サイズを選択</div>
+
+    <div class="product-list" id="product-list"></div>
+
+    <div class="order-bar">
+      <div class="order-summary-inner" id="order-summary">
+        <div id="summary-rows"></div>
+        <div class="summary-total">
+          <span>合計</span>
+          <span id="total-display">0 sats</span>
+        </div>
+      </div>
+      <button class="pay-btn" id="pay-btn" disabled onclick="goToPayment()">
+        ⚡ Lightning で支払う
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── PAYMENT SCREEN ─── -->
+  <div id="screen-payment" class="screen">
+    <div class="payment-screen">
+      <button class="nav-back" onclick="cancelPayment()">← 戻る</button>
+
+      <div class="pay-header">
+        <div class="pay-title">支払いQR</div>
+        <div class="pay-amount" id="pay-amount-display"></div>
+        <div class="pay-amount-label">satoshis</div>
+      </div>
+
+      <div id="status-pill-area">
+        <div class="status-pill status-waiting">
+          <span class="dot-pulse">●</span> 支払い待ち…
+        </div>
+      </div>
+
+      <div class="qr-wrapper">
+        <canvas id="qr-canvas"></canvas>
+      </div>
+
+      <div class="invoice-box" id="invoice-box">インボイス生成中…</div>
+
+      <button class="cancel-btn" onclick="cancelPayment()">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- ─── SUCCESS SCREEN ─── -->
+  <div id="screen-success" class="screen">
+    <div class="success-screen">
+      <div class="success-ring">✓</div>
+      <div class="success-title">支払い完了！</div>
+      <div class="success-sats" id="success-sats"></div>
+      <div class="success-items" id="success-items"></div>
+      <button class="next-btn" onclick="resetAll()">次の販売へ</button>
+    </div>
+  </div>
+
+  <!-- ─── CONFIG SCREEN ─── -->
+  <div id="screen-config" class="screen">
+    <div class="config-screen">
+      <button class="nav-back" onclick="showScreen('screen-products')">← 戻る</button>
+      <div style="padding: 16px 0 24px;">
+        <div style="font-size:20px; font-weight:700; letter-spacing:-0.5px;">設定</div>
+        <div style="font-size:13px; color:var(--muted); margin-top:4px;">サンドボックス環境の接続情報</div>
+      </div>
+
+      <div class="config-group">
+        <div class="config-lbl">Cloud Run URL</div>
+        <input class="config-input" id="cfg-apibase" placeholder="https://tbb-shop-api-xxxx-an.a.run.app" autocomplete="off" spellcheck="false"/>
+        <div class="config-hint">デプロイ後に発行されるCloud RunのURL（末尾スラッシュ不要）</div>
+      </div>
+
+      <div class="config-group">
+        <div class="config-lbl">Tシャツ価格（sats）</div>
+        <input class="config-input" id="cfg-price" type="number" placeholder="5000" value="5000"/>
+        <div class="config-hint">全サイズ共通の単価</div>
+      </div>
+
+      <div class="config-group" style="display:flex; align-items:center; gap:12px;">
+        <input type="checkbox" id="cfg-sandbox" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;"/>
+        <div>
+          <div class="config-lbl" style="margin-bottom:0;">サンドボックスモード</div>
+          <div class="config-hint">テスト中はON、本番運用時はOFF</div>
+        </div>
+      </div>
+
+      <button class="save-btn" onclick="saveConfig()">保存して戻る</button>
+
+      <div style="margin-top:20px; font-size:12px; color:var(--muted); line-height:1.7;">
+        ※ APIキーはCloud Run側で管理されています。<br>
+        このアプリにAPIキーを入力する必要はありません。<br>
+        設定はブラウザのローカルストレージに保存されます。
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- QRCode.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+// ── CONFIG ──────────────────────────────────────────
+// Cloud Run にデプロイ後、実際のURLに書き換えてください
+// 例: https://tbb-shop-api-xxxxxxxxxx-an.a.run.app
+const DEFAULT_API_BASE = "https://YOUR-CLOUD-RUN-URL";
+
+const DEFAULTS = { price: 5000 };
+
+const PRODUCTS = [
+  { id: "m",  label: "M",  name: "TBBTシャツ M" },
+  { id: "l",  label: "L",  name: "TBBTシャツ L" },
+  { id: "xl", label: "XL", name: "TBBTシャツ XL" },
+];
+
+// ── STATE ────────────────────────────────────────────
+let cart = {};
+let pollTimer = null;
+
+function getConfig() {
+  return {
+    apiBase:  localStorage.getItem("tbb_api_base") || DEFAULT_API_BASE,
+    sandbox:  localStorage.getItem("tbb_sandbox") !== "false",
+    price:    parseInt(localStorage.getItem("tbb_price") || DEFAULTS.price, 10)
+  };
+}
+
+function saveConfig() {
+  const b = document.getElementById("cfg-apibase").value.trim().replace(/\/$/, "");
+  const s = document.getElementById("cfg-sandbox").checked;
+  const p = parseInt(document.getElementById("cfg-price").value, 10);
+  if (b) localStorage.setItem("tbb_api_base", b);
+  localStorage.setItem("tbb_sandbox", s ? "true" : "false");
+  if (p > 0) localStorage.setItem("tbb_price", p);
+  renderProducts();
+  showScreen("screen-products");
+}
+
+// ── SCREENS ──────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  window.scrollTo(0, 0);
+}
+
+// ── PRODUCTS ─────────────────────────────────────────
+function renderProducts() {
+  const cfg   = getConfig();
+  const list  = document.getElementById("product-list");
+  list.innerHTML = "";
+
+  PRODUCTS.forEach(p => {
+    const qty = cart[p.id] || 0;
+    const card = document.createElement("div");
+    card.className = "product-card" + (qty > 0 ? " has-qty" : "");
+    card.innerHTML = `
+      <div class="size-badge">${p.label}</div>
+      <div class="product-info">
+        <div class="product-name">${p.name}</div>
+        <div class="product-price">${cfg.price.toLocaleString()} sats</div>
+      </div>
+      <div class="qty-row">
+        <button class="qty-btn" onclick="changeQty('${p.id}',-1)" aria-label="減らす">−</button>
+        <div class="qty-num">${qty}</div>
+        <button class="qty-btn" onclick="changeQty('${p.id}',1)" aria-label="増やす">＋</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+
+  renderSummary();
+}
+
+function changeQty(id, delta) {
+  cart[id] = Math.max(0, (cart[id] || 0) + delta);
+  renderProducts();
+}
+
+function getTotal() {
+  const cfg = getConfig();
+  return PRODUCTS.reduce((sum, p) => sum + (cart[p.id] || 0) * cfg.price, 0);
+}
+
+function renderSummary() {
+  const total   = getTotal();
+  const cfg     = getConfig();
+  const hasItem = total > 0;
+
+  const summaryEl = document.getElementById("order-summary");
+  summaryEl.classList.toggle("visible", hasItem);
+  document.getElementById("pay-btn").disabled = !hasItem;
+
+  const rows = document.getElementById("summary-rows");
+  rows.innerHTML = "";
+  PRODUCTS.forEach(p => {
+    const qty = cart[p.id] || 0;
+    if (qty > 0) {
+      const row = document.createElement("div");
+      row.className = "summary-row";
+      row.innerHTML = `<span>${p.name} × ${qty}</span><span>${(cfg.price * qty).toLocaleString()} sats</span>`;
+      rows.appendChild(row);
+    }
+  });
+  document.getElementById("total-display").textContent = total.toLocaleString() + " sats";
+}
+
+// ── PAYMENT ──────────────────────────────────────────
+async function goToPayment() {
+  showScreen("screen-payment");
+
+  const total = getTotal();
+  document.getElementById("pay-amount-display").textContent = total.toLocaleString();
+  document.getElementById("invoice-box").textContent = "インボイス生成中…";
+  setStatus("waiting", "支払い待ち…");
+
+  const canvas = document.getElementById("qr-canvas");
+  const ctx    = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const cfg = getConfig();
+
+  try {
+    // Cloud Run 経由でインボイスを取得（APIキーはサーバー側に秘匿）
+    const res = await fetch(`${cfg.apiBase}/invoice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: total, sandbox: cfg.sandbox })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || res.statusText);
+    }
+
+    const inv    = await res.json();
+    const bolt11 = inv.payment_request;
+
+    document.getElementById("invoice-box").textContent = bolt11;
+
+    const size = Math.min(canvas.parentElement.offsetWidth - 36, 240);
+    canvas.width  = size;
+    canvas.height = size;
+
+    const tmp = document.createElement("div");
+    new QRCode(tmp, {
+      text:         bolt11.toUpperCase(),
+      width:        size,
+      height:       size,
+      colorDark:    "#000000",
+      colorLight:   "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    setTimeout(() => {
+      const src = tmp.querySelector("img") || tmp.querySelector("canvas");
+      if (src) {
+        if (src.tagName === "CANVAS") {
+          ctx.drawImage(src, 0, 0, size, size);
+        } else {
+          const img = new Image();
+          img.onload = () => ctx.drawImage(img, 0, 0, size, size);
+          img.src = src.src;
+        }
+      }
+    }, 200);
+
+    startPolling(inv.id, total, cfg);
+
+  } catch (err) {
+    setStatus("error", "エラー: " + err.message);
+  }
+}
+
+function startPolling(invoiceId, total, cfg) {
+  if (pollTimer) clearInterval(pollTimer);
+  let attempts = 0;
+
+  pollTimer = setInterval(async () => {
+    attempts++;
+    if (attempts > 40) {
+      clearInterval(pollTimer);
+      setStatus("error", "タイムアウト。再度お試しください。");
+      return;
+    }
+    try {
+      const res  = await fetch(`${cfg.apiBase}/invoice/${invoiceId}/status`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.status === "COMPLETED" || data.status === "complete") {
+        clearInterval(pollTimer);
+        showSuccess(total);
+      }
+    } catch (_) {}
+  }, 3000);
+}
+
+function setStatus(type, msg) {
+  const area = document.getElementById("status-pill-area");
+  const cls  = { waiting: "status-waiting", done: "status-done", error: "status-error" }[type];
+  const dot  = type === "waiting" ? '<span class="dot-pulse">●</span> ' : "";
+  area.innerHTML = `<div class="status-pill ${cls}">${dot}${msg}</div>`;
+}
+
+function cancelPayment() {
+  if (pollTimer) clearInterval(pollTimer);
+  showScreen("screen-products");
+}
+
+// ── SUCCESS ──────────────────────────────────────────
+function showSuccess(total) {
+  document.getElementById("success-sats").textContent = total.toLocaleString() + " sats";
+  const cfg = getConfig();
+  const lines = PRODUCTS
+    .filter(p => (cart[p.id] || 0) > 0)
+    .map(p => `${p.name} × ${cart[p.id]}　${(cfg.price * cart[p.id]).toLocaleString()} sats`)
+    .join("<br>");
+  document.getElementById("success-items").innerHTML = lines;
+  showScreen("screen-success");
+}
+
+function resetAll() {
+  cart = {};
+  if (pollTimer) clearInterval(pollTimer);
+  renderProducts();
+  showScreen("screen-products");
+}
+
+// ── INIT ─────────────────────────────────────────────
+(function init() {
+  const cfg = getConfig();
+  document.getElementById("cfg-apibase").value    = cfg.apiBase !== DEFAULT_API_BASE ? cfg.apiBase : "";
+  document.getElementById("cfg-sandbox").checked  = cfg.sandbox;
+  document.getElementById("cfg-price").value      = cfg.price;
+  renderProducts();
+})();
+</script>
+</body>
+</html>
