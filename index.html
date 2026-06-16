@@ -449,7 +449,7 @@
 // ── CONFIG ──────────────────────────────────────────
 // Cloud Run にデプロイ後、実際のURLに書き換えてください
 // 例: https://tbb-shop-api-xxxxxxxxxx-an.a.run.app
-const DEFAULT_API_BASE = "https://amboss-shop-production.up.railway.app";
+const DEFAULT_API_BASE = "https://YOUR-CLOUD-RUN-URL";
 
 const DEFAULTS = { price: 5000 };
 
@@ -630,7 +630,12 @@ function startPolling(invoiceId, total, cfg) {
       return;
     }
     try {
-      const res  = await fetch(`${cfg.apiBase}/invoice/${invoiceId}/status`);
+      const itemsStr = encodeURIComponent(
+        PRODUCTS.filter(p => (cart[p.id] || 0) > 0)
+          .map(p => `${p.name} x${cart[p.id]}`)
+          .join(", ")
+      );
+      const res  = await fetch(`${cfg.apiBase}/invoice/${invoiceId}/status?amount=${total}&items=${itemsStr}`);
       if (!res.ok) return;
       const data = await res.json();
       if (data.status === "COMPLETED" || data.status === "complete") {

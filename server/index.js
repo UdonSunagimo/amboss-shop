@@ -4,10 +4,12 @@ import cors from "cors";
 const app  = express();
 const PORT = process.env.PORT || 8080;
 
-const AMBOSS_ENDPOINT = "https://rails.amboss.tech/graphql";
-const API_KEY         = process.env.AMBOSS_API_KEY;
-const WALLET_ID       = process.env.AMBOSS_WALLET_ID;
-const ALLOWED_ORIGIN  = process.env.ALLOWED_ORIGIN || "*";
+const AMBOSS_ENDPOINT   = "https://rails.amboss.tech/graphql";
+const API_KEY           = process.env.AMBOSS_API_KEY;
+const WALLET_ID         = process.env.AMBOSS_WALLET_ID;
+const ALLOWED_ORIGIN    = process.env.ALLOWED_ORIGIN || "*";
+const NOTION_TOKEN      = process.env.NOTION_TOKEN;
+const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
 if (!API_KEY || !WALLET_ID) {
   console.error("ERROR: AMBOSS_API_KEY と AMBOSS_WALLET_ID を環境変数に設定してください");
@@ -18,6 +20,43 @@ app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(express.json());
 
 app.get("/", (_req, res) => res.json({ status: "ok", service: "TBB Shop API" }));
+
+// ── Notionに売上を記録 ────────────────────────────
+async function recordToNotion(amount, items) {
+  if (!NOTION_TOKEN || !NOTION_DATABASE_ID) return;
+
+  try {
+    await fetch("https://api.notion.com/v1/pages", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${NOTION_TOKEN}`,
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+      },
+      body: JSON.stringify({
+        parent: { database_id: NOTION_DATABASE_ID },
+        properties: {
+          "名前": {
+            title: [{ text: { content: `TBB Shop 売上` } }]
+          },
+          "日時": {
+            date: { start: new Date().toISOString() }
+          },
+          "合計（sats）": {
+            number: amount
+          },
+          "明細": {
+            rich_text: [{ text: { content: items } }]
+          },
+        },
+      }),
+    });
+    console.log("Notion に記録しました");
+  } catch (err) {
+    // Notion記録失敗は致命的エラーにしない
+    console.error("Notion記録エラー:", err);
+  }
+}
 
 // ── インボイス作成 ────────────────────────────────
 app.post("/invoice", async (req, res) => {
@@ -91,6 +130,7 @@ app.post("/invoice", async (req, res) => {
 // ── 支払いステータス確認 ──────────────────────────
 app.get("/invoice/:id/status", async (req, res) => {
   const { id } = req.params;
+  const { amount, items } = req.query;
 
   const query = `
     query GetTransaction($id: String!) {
@@ -121,6 +161,11 @@ app.get("/invoice/:id/status", async (req, res) => {
     if (!status) {
       const msg = data?.errors?.[0]?.message || "支払い情報が見つかりません";
       return res.status(404).json({ error: msg });
+    }
+
+    // 支払い完了時にNotionに記録
+    if (status === "COMPLETED" && amount && items) {
+      await recordToNotion(parseInt(amount, 10), decodeURIComponent(items));
     }
 
     return res.json({ id, status });
