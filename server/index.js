@@ -4,7 +4,7 @@ import cors from "cors";
 const app  = express();
 const PORT = process.env.PORT || 8080;
 
-const AMBOSS_ENDPOINT = "https://api.amboss.tech/graphql";
+const AMBOSS_ENDPOINT = "https://rails.amboss.tech/graphql";
 const API_KEY         = process.env.AMBOSS_API_KEY;
 const WALLET_ID       = process.env.AMBOSS_WALLET_ID;
 // 本番フロントエンドのオリジン（GitHub PagesのURL）を環境変数で設定
