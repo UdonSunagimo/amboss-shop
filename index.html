@@ -641,6 +641,8 @@ function startPolling(invoiceId, total, cfg) {
       if (data.status === "COMPLETED" || data.status === "complete") {
         clearInterval(pollTimer);
         showSuccess(total);
+        // 次回以降のポーリングでは recorded=1 を付けて重複記録を防ぐ
+        invoiceId = null;
       }
     } catch (_) {}
   }, 3000);

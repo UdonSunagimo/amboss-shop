@@ -11,6 +11,9 @@ const ALLOWED_ORIGIN    = process.env.ALLOWED_ORIGIN || "*";
 const NOTION_TOKEN      = process.env.NOTION_TOKEN;
 const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
+// 記録済みinvoice IDのキャッシュ（重複防止）
+const recordedInvoices = new Set();
+
 if (!API_KEY || !WALLET_ID) {
   console.error("ERROR: AMBOSS_API_KEY と AMBOSS_WALLET_ID を環境変数に設定してください");
   process.exit(1);
@@ -164,8 +167,9 @@ app.get("/invoice/:id/status", async (req, res) => {
       return res.status(404).json({ error: msg });
     }
 
-    // 支払い完了時にNotionに記録
-    if (status === "COMPLETED" && amount && items) {
+    // 支払い完了時にNotionに記録（重複防止）
+    if (status === "COMPLETED" && amount && items && !recordedInvoices.has(id)) {
+      recordedInvoices.add(id);
       await recordToNotion(parseInt(amount, 10), decodeURIComponent(items));
     }
 
